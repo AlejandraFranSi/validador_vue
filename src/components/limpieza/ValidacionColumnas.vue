@@ -8,6 +8,7 @@ const estadoData = useDataStore();
 const columnas = computed(() => estadoData.esquema.esquemaColumnas);
 const sisdaiModal = ref(null);
 const columnaPorEliminar = ref(null);
+const modalLoading = ref(false);
 const typeActions = {
   Texto: [
     { accion: "Texto sin guiones", funcion: "sin_guiones" },
@@ -35,8 +36,16 @@ const confirmarEliminacion = async function (columna) {
   sisdaiModal.value?.abrirModal();
 };
 
-const eliminarColumna = function () {
-  console.log("Eliminar la columna: ", columnaPorEliminar.value);
+const eliminarColumna = async function () {
+  modalLoading.value = true;
+  const nuevoEsquema = await invoke("eliminar_columna", {
+    columna: columnaPorEliminar.value.nombre,
+  });
+  estadoData.actualizarEsquemaColumnas(nuevoEsquema);
+  estadoData.resetearFilas();
+  await estadoData.fetchNextRows();
+  modalLoading.value = false;
+  sisdaiModal.value?.cerrarModal();
 };
 
 const promoverCambios = function () {
@@ -138,10 +147,13 @@ const promoverCambios = function () {
     <template #encabezado>
       <h3>Eliminar columna</h3>
     </template>
-    <template #cuerpo
+    <template #cuerpo v-if="!isModalLoading"
       >¿Estás segurx que deseas eliminar la columna:
-      {{ columnaPorEliminar.nombre }}?</template
-    >
+      {{ columnaPorEliminar.nombre }}?
+    </template>
+    <template #cuerpo v-else>
+      <p if="isModalLoading">Eliminando {{ columnaPorEliminar.nombre }}...</p>
+    </template>
 
     <template #pie>
       <button class="boton-primario" @click="eliminarColumna">Eliminar</button>

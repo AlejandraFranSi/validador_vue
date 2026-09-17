@@ -37,6 +37,10 @@ export const useDataStore = defineStore("data", () => {
     absolutePath.value = pathString;
   };
 
+  const actualizarEsquemaColumnas = function (nuevoEsquema) {
+    esquema.value.esquemaColumnas = nuevoEsquema;
+  };
+
   const resetearStatus = function () {
     dataStatus.value.isLoading = false;
     dataStatus.value.wasFetchingSuccesfull = null;
@@ -204,6 +208,8 @@ export const useDataStore = defineStore("data", () => {
     esquema,
     filas,
     updatePath,
+    actualizarEsquemaColumnas,
+    resetearFilas,
     readCSV,
     fetchNextRows,
     fetchPreviousRows,

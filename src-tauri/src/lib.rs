@@ -23,7 +23,7 @@ pub fn run() {
          .manage(ContenedorDatos { 
             dataframe: Mutex::new(None),
         })
-        .invoke_handler(tauri::generate_handler![leer_csv, fetch_rows, castear_columna])
+        .invoke_handler(tauri::generate_handler![leer_csv, fetch_rows, eliminar_columna, castear_columna])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -167,13 +167,64 @@ fn es_caracter_corrupto(c: char) -> bool {
 }
 
 /**
- * Esta función intenta hacer la transformación de una columna con valores
- * de un tipo a otro tipo. También intenta cambiar el nombre de la columna.
+ * Construye el esquema de las columnas
  */
-#[tauri::command]
-fn castear_columna(cols: Vec<(&str, &str, &str)>){
-    println!("{:?}", cols);
+fn obtener_esquema_columnas(df: &DataFrame) -> Result<Vec<EsquemaColumna>, String>{
+    let mut esquema_columnas: Vec<EsquemaColumna> = Vec::new();     
+    let nombres: Vec<String> = df
+        .get_column_names()
+        .iter()
+        .map(|s| s.to_string())
+        .collect();  
+
+    let mut df_nulls = df.clone().lazy()
+        .filter(
+            nombres
+                .iter()
+                .map(|c| col(c).is_null())
+                .reduce(|acc, e| acc.and(e))
+                .ok_or_else(|| "La lista de columnas está vacía".to_string())?
+                .not()
+        )
+        .collect()
+        .map_err(|_| "Fracasó la búsqueda de nulos".to_string())?;
+    let mut esquema_columnas: Vec<EsquemaColumna> = Vec::new();     
+    
+    for nombre in nombres {
+        let propiedades = validar_cadena(&nombre);
+        let nombre_sugerido = propiedades.sugerido;
+        let incidencia: bool = propiedades.incidencia;
+        let errores: Vec<String> = propiedades.errores;
+        let column = df_nulls.column(&nombre).unwrap().clone();
+        let mut tipo: String;
+
+        let parsed_as_datetime = column.as_materialized_series().date();
+        if parsed_as_datetime.is_ok() {
+            let parsed_column = column.as_materialized_series().date().unwrap().clone().into_column();
+            df_nulls.replace(&nombre, parsed_column);
+            tipo = "Temporal".to_string();
+        } else {
+            let parsed_as_float = column.as_materialized_series().f64();
+            if parsed_as_float.is_ok(){
+                let parsed_column = parsed_as_float.unwrap().clone().into_column();
+                df_nulls.replace(&nombre, parsed_column);
+                tipo = "Numérica".to_string();
+            } else { 
+                let parsed_as_int = column.as_materialized_series().i64();
+                if parsed_as_int.is_ok(){
+                    let parsed_column = parsed_as_int.unwrap().clone().into_column();
+                    df_nulls.replace(&nombre, parsed_column);
+                    tipo = "Numérica".to_string();
+                } else { 
+                    tipo = "Texto".to_string();
+                }
+            }
+        }
+        esquema_columnas.push(EsquemaColumna{nombre, nombre_sugerido, incidencia, tipo, errores});
+    }
+    Ok(esquema_columnas)
 }
+
 
 /**
  * Esta función se encarga de leer el archivo y crear el dataframe. Para ello ocurren varias cosas:
@@ -361,3 +412,29 @@ fn fetch_rows(start_index: usize, block_size: usize, state: tauri::State<'_, Con
     let json_rows: Value = serde_json::from_slice(&buf).map_err(|e| format!("Error al estructurar el JSON: {}", e))?;
     Ok(json_rows)
 }
+
+
+/**
+ * Esta función elimina una columna del df
+ */
+#[tauri::command]
+fn eliminar_columna(columna: String, state: tauri::State<'_, ContenedorDatos>) -> Result<Vec<EsquemaColumna>, String>{
+    let mut el_dataframe = state.dataframe.lock().map_err(|_| "No se pudieron recuperar las filas".to_string())?;
+    let nuevo_df = el_dataframe.as_ref().unwrap().drop(&columna).unwrap();
+    let esquema: Result<Vec<EsquemaColumna>, String> = obtener_esquema_columnas(&nuevo_df);
+    *el_dataframe = Some(nuevo_df);
+
+    Ok(esquema.unwrap())
+}
+
+/**
+ * Esta función intenta hacer la transformación de una columna con valores
+ * de un tipo a otro tipo. También intenta cambiar el nombre de la columna.
+ */
+#[tauri::command]
+fn castear_columna(cols: Vec<(&str, &str, &str)>){
+    for columna in cols.iter(){
+        println!("{:?}", columna);
+    }
+}
+
