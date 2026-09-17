@@ -79,7 +79,6 @@ export const useDataStore = defineStore("data", () => {
       const data_csv = await invoke("leer_csv", {
         rutaFront: absolutePath.value,
       });
-      console.log(data_csv);
       esquema.value = {
         infoArchivo: data_csv.nombre_archivo,
         encoding: data_csv.encoding_aplicado,

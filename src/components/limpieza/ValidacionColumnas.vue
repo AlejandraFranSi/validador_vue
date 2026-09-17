@@ -1,35 +1,27 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { useDataStore } from "../../stores/data.js";
 import TablaCSV from "../base/TablaCSV.vue";
 import { invoke } from "@tauri-apps/api/core";
 
 const estadoData = useDataStore();
 const columnas = computed(() => estadoData.esquema.esquemaColumnas);
-const preposiciones = [
-  "a",
-  "ante",
-  "bajo",
-  "cabe",
-  "con",
-  "contra",
-  "de",
-  "desde",
-  "durante",
-  "en",
-  "entre",
-  "hacia",
-  "hasta",
-  "mediante",
-  "para",
-  "por",
-  "segun",
-  "sin",
-  "so",
-  "sobre",
-  "tras",
-  "versus",
-];
+const sisdaiModal = ref(null);
+const columnaPorEliminar = ref(null);
+const typeActions = {
+  Texto: [
+    { accion: "Texto sin guiones", funcion: "sin_guiones" },
+    { accion: "Texto en minúsculas", funcion: "minuscula" },
+    { accion: "Texto capitalizado", funcion: "capitalizado" },
+  ],
+  Numérica: [
+    { accion: "Enteros", funcion: "enteros" },
+    { accion: "Dos decimales", funcion: "dos_decimales" },
+    { accion: "Porcentaje", funcion: "porcenaje" },
+  ],
+  Temporal: [{ accion: "ISO8601", funcion: "fecha_iso8601" }],
+  Coordenadas: [{ accion: "Coordenadas", funcion: "coordenadas" }],
+};
 
 const typeDict = {
   Temporal: "#EE4266",
@@ -37,26 +29,28 @@ const typeDict = {
   Texto: "#2BB4DE",
 };
 
+const confirmarEliminacion = async function (columna) {
+  columnaPorEliminar.value = columna;
+  await nextTick();
+  sisdaiModal.value?.abrirModal();
+};
+
+const eliminarColumna = function () {
+  console.log("Eliminar la columna: ", columnaPorEliminar.value);
+};
+
 const promoverCambios = function () {
   let colsDict = [];
   for (const [i, columna] of columnas.value.entries()) {
     const inputNombre = document.getElementById(`nombre-columna-${i}`).value;
     const inputTipo = document.getElementById(`tipo-columna-${i}`).value;
-    colsDict.push([columna.nombre, inputNombre, inputTipo]);
+    const funcionAplicada = typeActions[columna.tipo].find(
+      (d) => d.accion == inputTipo,
+    )["funcion"];
+
+    colsDict.push([columna.nombre, inputNombre, funcionAplicada]);
   }
-  console.log(colsDict);
   invoke("castear_columna", { cols: colsDict });
-};
-const sugerirNombre = function (nombre) {
-  let nombreSugerido = nombre
-    .toLowerCase()
-    .replace(" ", "_")
-    .normalize("NFC")
-    .replace(/[\u0300-\u036f]/g, "");
-  for (let preposicion of preposiciones) {
-    nombreSugerido.replace(preposicion, "");
-  }
-  return nombreSugerido;
 };
 </script>
 <template>
@@ -68,7 +62,10 @@ const sugerirNombre = function (nombre) {
   <div class="contenedor-columnas">
     <div class="flex columna-contenida" v-for="(columna, index) in columnas">
       <div>
-        <button class="boton-chico boton-secundario columna-1">
+        <button
+          class="boton-chico boton-secundario columna-1"
+          @click="confirmarEliminacion(columna)"
+        >
           <svg
             width="22px"
             height="22px"
@@ -125,13 +122,9 @@ const sugerirNombre = function (nombre) {
           &nbsp a:</label
         >
         <select :name="`nombre-columna-${index}`" :id="`tipo-columna-${index}`">
-          <option value="texto">Texto</option>
-          <option value="texto-sin-guines">Texto sin guiones</option>
-          <option value="texto-minusculas">Texto en minúsculas</option>
-          <option value="texto-capitalizado">Texto capitalizado</option>
-          <option value="numerico">Numérica</option>
-          <option value="fecha">Fecha</option>
-          <option value="cordenada">Coordenadas</option>
+          <option v-for="opcion in typeActions[columna.tipo]">
+            {{ opcion.accion }}
+          </option>
         </select>
       </div>
     </div>
@@ -141,10 +134,26 @@ const sugerirNombre = function (nombre) {
   </button>
 
   <TablaCSV />
+  <SisdaiModal ref="sisdaiModal" v-if="columnaPorEliminar">
+    <template #encabezado>
+      <h3>Eliminar columna</h3>
+    </template>
+    <template #cuerpo
+      >¿Estás segurx que deseas eliminar la columna:
+      {{ columnaPorEliminar.nombre }}?</template
+    >
+
+    <template #pie>
+      <button class="boton-primario" @click="eliminarColumna">Eliminar</button>
+      <button class="boton-secundario" @click="sisdaiModal?.cerrarModal">
+        Cancelar
+      </button>
+    </template>
+  </SisdaiModal>
 </template>
 <style scoped lang="scss">
 .contenedor-columnas {
-  max-height: 30vh;
+  max-height: 35vh;
   overflow-y: auto;
 }
 
