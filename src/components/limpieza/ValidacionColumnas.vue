@@ -59,7 +59,7 @@ const promoverCambios = async function () {
 
     colsDict.push([columna.nombre, inputNombre, funcionAplicada]);
   }
-  const columnasCasteadas = invoke("castear_columna", { cols: colsDict });
+  const columnasCasteadas = invoke("transformar_columnas", { cols: colsDict });
   console.log(columnasCasteadas);
 };
 </script>

@@ -23,7 +23,7 @@ pub fn run() {
          .manage(ContenedorDatos { 
             dataframe: Mutex::new(None),
         })
-        .invoke_handler(tauri::generate_handler![leer_csv, fetch_rows, eliminar_columna, castear_columna])
+        .invoke_handler(tauri::generate_handler![leer_csv, fetch_rows, eliminar_columna, transformar_columnas])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -170,14 +170,12 @@ fn es_caracter_corrupto(c: char) -> bool {
  * Construye el esquema de las columnas
  */
 fn obtener_esquema_columnas(df: &DataFrame) -> Result<(Vec <EsquemaColumna>,DataFrame, Vec<String>), String>{
-    println!("El dataframe {:?}", df);
     let mut esquema_columnas: Vec<EsquemaColumna> = Vec::new();     
     let nombres: Vec<String> = df
         .get_column_names()
         .iter()
         .map(|s| s.to_string())
         .collect();  
-    println!("Las columnas {:?}", &nombres);
     let mut df_nulls = df.clone().lazy()
         .filter(
             nombres
@@ -385,19 +383,38 @@ fn eliminar_columna(columna: String, state: tauri::State<'_, ContenedorDatos>){
  * almacenado en el estado de la app.
  */
 #[tauri::command]
-fn castear_columna(cols: Vec<(&str, &str, &str)>, state: tauri::State<'_, ContenedorDatos>) -> Result<String, String>{
-    println!("{:?}", cols);
-    let mut arg_columnas: Vec<(&str, PlSmallStr)> = Vec::new();
+fn transformar_columnas(cols: Vec<(&str, &str, &str)>, state: tauri::State<'_, ContenedorDatos>) -> Result<String, String>{
+    println!("se intentará transformar las columnas");
+    let df_en_memoria = state.dataframe.lock().map_err(|_| "No se pudo recuperar el df guardado en memoria".to_string())?;
+    let mut nuevo_df = df_en_memoria.clone().ok_or_else(|| "Ocurrio un error").map_err(|e| format!("No se pudo sacar el df del muteguard: {e}"))?;
     for columna in cols.iter(){
-        let arg = (columna.0, PlSmallStr::from(columna.1.trim()));
-        arg_columnas.push(arg);
+        nuevo_df.rename(columna.0, columna.1.into()).map_err(|e| format!("El error {e}"));
     }
-    let iter_columnas = arg_columnas.iter().map(|x| x.to_owned());
-    let mut el_dataframe = state.dataframe.lock().map_err(|_| "No se pudieron recuperar las filas".to_string())?;
-    let nuevo_df = el_dataframe.as_mut().unwrap().rename_many(iter_columnas).unwrap().to_owned();
     
-    let columnas = nuevo_df.get_column_names();
-    println!("Las columnas del nuevo df: {:?}", columnas);
+    println!("El dataframe {:?}", nuevo_df);
+    /*let df_modificado = nuevo_df.rename_many(iter_columnas).map_err(|e| format!("Fracasó la operación de cambio de nombres{e}"))?;
+    
+    let nombres: Vec<&PlSmallStr> = df_modificado
+        .get_column_names();
+        //.iter()
+        //.map(|s| s.to_owned())
+        //.collect();  
+
+    let mut df_nulls = df_modificado.clone().lazy()
+        .filter(
+            nombres
+                .iter()
+                .map(|c| col(c.to_string()).is_null())
+                .reduce(|acc, e| acc.and(e))
+                .ok_or_else(|| "La lista de columnas está vacía".to_string())?
+                .not()
+        ).collect()
+        .map_err(|e| format!("Fracasó la búsqueda de nulos {e}"))?;
+    println!("El df_mulls: {:?}", df_nulls);*/
+    let (nuevo_esquema, df, nuevos_nombres) = obtener_esquema_columnas(&nuevo_df).map_err(|e| format!("Ocurrió un error al obtener el nuevo esquema {e}"))?;
+    println!("El nuevo esquema: {:?}. El nuevo df {:?} y los nuevos nombres {:?}", nuevo_esquema, df, nuevos_nombres);
+    //let columnas = nuevo_df.get_column_names();
+    //println!("Las columnas del nuevo df: {:?}", columnas);
     //let esquema: Result<Vec<EsquemaColumna>, String> = obtener_esquema_columnas(&nuevo_df).0;
     //println!("El esquema: {:?}", esquema);
     //*el_dataframe = Some(nuevo_df);
