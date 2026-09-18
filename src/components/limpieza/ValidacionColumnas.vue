@@ -48,7 +48,7 @@ const eliminarColumna = async function () {
   sisdaiModal.value?.cerrarModal();
 };
 
-const promoverCambios = function () {
+const promoverCambios = async function () {
   let colsDict = [];
   for (const [i, columna] of columnas.value.entries()) {
     const inputNombre = document.getElementById(`nombre-columna-${i}`).value;
@@ -59,7 +59,8 @@ const promoverCambios = function () {
 
     colsDict.push([columna.nombre, inputNombre, funcionAplicada]);
   }
-  invoke("castear_columna", { cols: colsDict });
+  const columnasCasteadas = invoke("castear_columna", { cols: colsDict });
+  console.log(columnasCasteadas);
 };
 </script>
 <template>

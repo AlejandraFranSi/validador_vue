@@ -169,14 +169,15 @@ fn es_caracter_corrupto(c: char) -> bool {
 /**
  * Construye el esquema de las columnas
  */
-fn obtener_esquema_columnas(df: &DataFrame) -> Result<Vec<EsquemaColumna>, String>{
+fn obtener_esquema_columnas(df: &DataFrame) -> Result<(Vec <EsquemaColumna>,DataFrame, Vec<String>), String>{
+    println!("El dataframe {:?}", df);
     let mut esquema_columnas: Vec<EsquemaColumna> = Vec::new();     
     let nombres: Vec<String> = df
         .get_column_names()
         .iter()
         .map(|s| s.to_string())
         .collect();  
-
+    println!("Las columnas {:?}", &nombres);
     let mut df_nulls = df.clone().lazy()
         .filter(
             nombres
@@ -187,10 +188,10 @@ fn obtener_esquema_columnas(df: &DataFrame) -> Result<Vec<EsquemaColumna>, Strin
                 .not()
         )
         .collect()
-        .map_err(|_| "Fracasó la búsqueda de nulos".to_string())?;
-    let mut esquema_columnas: Vec<EsquemaColumna> = Vec::new();     
+        .map_err(|e| format!("Fracasó la búsqueda de nulos {e}"))?;
     
-    for nombre in nombres {
+    let copia_nombres = nombres.clone();
+    for nombre in copia_nombres {
         let propiedades = validar_cadena(&nombre);
         let nombre_sugerido = propiedades.sugerido;
         let incidencia: bool = propiedades.incidencia;
@@ -222,7 +223,7 @@ fn obtener_esquema_columnas(df: &DataFrame) -> Result<Vec<EsquemaColumna>, Strin
         }
         esquema_columnas.push(EsquemaColumna{nombre, nombre_sugerido, incidencia, tipo, errores});
     }
-    Ok(esquema_columnas)
+    Ok((esquema_columnas, df_nulls, nombres))
 }
 
 
@@ -307,7 +308,6 @@ fn leer_csv(ruta_front: String, state: State<'_, ContenedorDatos>) -> Result<Rep
 
     // Construimos el df
     let cursor = Cursor::new(&contenido_final);
-    let mut esquema_columnas: Vec<EsquemaColumna> = Vec::new();  
     let mut df = CsvReader::new(cursor).with_options(
         CsvReadOptions::default()
             .with_has_header(true)
@@ -328,26 +328,10 @@ fn leer_csv(ruta_front: String, state: State<'_, ContenedorDatos>) -> Result<Rep
        return Err("No se pudo leer correctamente el archivo. Verifica que no tenga columnas sin nombre ni encabezados".to_string())
     }
 
-    // Ahora vamos a intentar castear las columnas del df
-    let nombres: Vec<String> = df
-    .get_column_names()
-    .iter()
-    .map(|s| s.to_string())
-    .collect();
+    // Intentamos castear las columnas al tipo adecuado y generamos el esquema de columnas
+    let (esquema_columnas, df_nulls, nombres) = obtener_esquema_columnas(&df).map_err(|e| format!("fracasó la función {e}"))?;
 
-    //let df_sin_nulls = df.drop_nulls(Some(&nombres)).map_err(|_| "Fracasó la búsqueda de nulos".to_string())?;
-    let mut df_nulls = df.clone().lazy()
-        .filter(
-            nombres
-                .iter()
-                .map(|c| col(c).is_null())
-                .reduce(|acc, e| acc.and(e))
-                .ok_or_else(|| "La lista de columnas está vacía".to_string())?
-                .not()
-        )
-        .collect()
-        .map_err(|_| "Fracasó la búsqueda de nulos".to_string())?;
-    
+    // Obtenemos información extra
     let total_filas = df_nulls.height();
     let null_rows = df.height() - df_nulls.height();
     let are_rows_unique = df_nulls.is_duplicated().map_err(|_| "No se pudo comparar las filas.".to_string())?;
@@ -357,38 +341,6 @@ fn leer_csv(ruta_front: String, state: State<'_, ContenedorDatos>) -> Result<Rep
     let nombres_columnas_repetidas:bool = if nombres_repetidos.iter().len() > 0 { true} else {false};
     let total_columnas = nombres.len();
 
-    for nombre in nombres {
-        let propiedades = validar_cadena(&nombre);
-        let nombre_sugerido = propiedades.sugerido;
-        let incidencia: bool = propiedades.incidencia;
-        let errores: Vec<String> = propiedades.errores;
-        let column = df_nulls.column(&nombre).unwrap().clone();
-        let mut tipo: String;
-
-        let parsed_as_datetime = column.as_materialized_series().date();
-        if parsed_as_datetime.is_ok() {
-            let parsed_column = column.as_materialized_series().date().unwrap().clone().into_column();
-            df_nulls.replace(&nombre, parsed_column);
-            tipo = "Temporal".to_string();
-        } else {
-            let parsed_as_float = column.as_materialized_series().f64();
-            if parsed_as_float.is_ok(){
-                let parsed_column = parsed_as_float.unwrap().clone().into_column();
-                df_nulls.replace(&nombre, parsed_column);
-                tipo = "Numérica".to_string();
-            } else { 
-                let parsed_as_int = column.as_materialized_series().i64();
-                if parsed_as_int.is_ok(){
-                    let parsed_column = parsed_as_int.unwrap().clone().into_column();
-                    df_nulls.replace(&nombre, parsed_column);
-                    tipo = "Numérica".to_string();
-                } else { 
-                    tipo = "Texto".to_string();
-                }
-            }
-        }
-        esquema_columnas.push(EsquemaColumna{nombre, nombre_sugerido, incidencia, tipo, errores});
-    }
 
     let mut guardado = state.dataframe.lock().map_err(|_| "Error al bloquear el estado")?;
     *guardado = Some(df_nulls);
@@ -418,23 +370,38 @@ fn fetch_rows(start_index: usize, block_size: usize, state: tauri::State<'_, Con
  * Esta función elimina una columna del df
  */
 #[tauri::command]
-fn eliminar_columna(columna: String, state: tauri::State<'_, ContenedorDatos>) -> Result<Vec<EsquemaColumna>, String>{
-    let mut el_dataframe = state.dataframe.lock().map_err(|_| "No se pudieron recuperar las filas".to_string())?;
-    let nuevo_df = el_dataframe.as_ref().unwrap().drop(&columna).unwrap();
-    let esquema: Result<Vec<EsquemaColumna>, String> = obtener_esquema_columnas(&nuevo_df);
-    *el_dataframe = Some(nuevo_df);
+fn eliminar_columna(columna: String, state: tauri::State<'_, ContenedorDatos>){
+    let mut el_dataframe = state.dataframe.lock().map_err(|_| "No se pudieron recuperar las filas".to_string());
+    //let nuevo_df = el_dataframe.as_ref().unwrap().drop(&columna).unwrap();
+    //let esquema: Result<Vec<EsquemaColumna>, String> = obtener_esquema_columnas(&nuevo_df).0;
+    //*el_dataframe = Some(nuevo_df);
 
-    Ok(esquema.unwrap())
+    //Ok(esquema.unwrap())
 }
 
 /**
- * Esta función intenta hacer la transformación de una columna con valores
- * de un tipo a otro tipo. También intenta cambiar el nombre de la columna.
+ * Esta función cambia el nombre de las columnas según el input en el front. 
+ * También aplica transformaciones sobre las columnas y actualiza el dataframe
+ * almacenado en el estado de la app.
  */
 #[tauri::command]
-fn castear_columna(cols: Vec<(&str, &str, &str)>){
+fn castear_columna(cols: Vec<(&str, &str, &str)>, state: tauri::State<'_, ContenedorDatos>) -> Result<String, String>{
+    println!("{:?}", cols);
+    let mut arg_columnas: Vec<(&str, PlSmallStr)> = Vec::new();
     for columna in cols.iter(){
-        println!("{:?}", columna);
+        let arg = (columna.0, PlSmallStr::from(columna.1.trim()));
+        arg_columnas.push(arg);
     }
+    let iter_columnas = arg_columnas.iter().map(|x| x.to_owned());
+    let mut el_dataframe = state.dataframe.lock().map_err(|_| "No se pudieron recuperar las filas".to_string())?;
+    let nuevo_df = el_dataframe.as_mut().unwrap().rename_many(iter_columnas).unwrap().to_owned();
+    
+    let columnas = nuevo_df.get_column_names();
+    println!("Las columnas del nuevo df: {:?}", columnas);
+    //let esquema: Result<Vec<EsquemaColumna>, String> = obtener_esquema_columnas(&nuevo_df).0;
+    //println!("El esquema: {:?}", esquema);
+    //*el_dataframe = Some(nuevo_df);
+
+    Ok("No funcionó".to_string())
 }
 
