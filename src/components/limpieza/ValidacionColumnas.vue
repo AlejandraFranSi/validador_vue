@@ -59,8 +59,13 @@ const promoverCambios = async function () {
 
     colsDict.push([columna.nombre, inputNombre, funcionAplicada]);
   }
-  const columnasCasteadas = invoke("transformar_columnas", { cols: colsDict });
+  const columnasCasteadas = await invoke("transformar_columnas", {
+    cols: colsDict,
+  });
   console.log(columnasCasteadas);
+  estadoData.actualizarEsquemaColumnas(columnasCasteadas);
+  estadoData.resetearFilas();
+  await estadoData.fetchNextRows();
 };
 </script>
 <template>

@@ -368,13 +368,13 @@ fn fetch_rows(start_index: usize, block_size: usize, state: tauri::State<'_, Con
  * Esta función elimina una columna del df
  */
 #[tauri::command]
-fn eliminar_columna(columna: String, state: tauri::State<'_, ContenedorDatos>){
-    let mut el_dataframe = state.dataframe.lock().map_err(|_| "No se pudieron recuperar las filas".to_string());
-    //let nuevo_df = el_dataframe.as_ref().unwrap().drop(&columna).unwrap();
-    //let esquema: Result<Vec<EsquemaColumna>, String> = obtener_esquema_columnas(&nuevo_df).0;
-    //*el_dataframe = Some(nuevo_df);
-
-    //Ok(esquema.unwrap())
+fn eliminar_columna(columna: String, state: tauri::State<'_, ContenedorDatos>) -> Result<Vec<EsquemaColumna>, String>{
+    let mut el_dataframe = state.dataframe.lock().map_err(|_| "No se pudieron recuperar las filas".to_string())?;
+    let unwraped_df =  el_dataframe.clone().ok_or_else(|| "Ocurrio un error").map_err(|e| format!("No se pudo sacar el df del muteguard: {e}"))?;
+    let nuevo_df = unwraped_df.drop(&columna).map_err(|_| "No se pudo eliminar la columna")?;
+    let (esquema, _df, _otro) = obtener_esquema_columnas(&nuevo_df).map_err(|e| format!("Ocurrió un error al obtener el esquema: {e}"))?;
+    *el_dataframe = Some(nuevo_df);
+    Ok(esquema)
 }
 
 /**
@@ -383,42 +383,14 @@ fn eliminar_columna(columna: String, state: tauri::State<'_, ContenedorDatos>){
  * almacenado en el estado de la app.
  */
 #[tauri::command]
-fn transformar_columnas(cols: Vec<(&str, &str, &str)>, state: tauri::State<'_, ContenedorDatos>) -> Result<String, String>{
-    println!("se intentará transformar las columnas");
-    let df_en_memoria = state.dataframe.lock().map_err(|_| "No se pudo recuperar el df guardado en memoria".to_string())?;
+fn transformar_columnas(cols: Vec<(&str, &str, &str)>, state: tauri::State<'_, ContenedorDatos>) -> Result<Vec<EsquemaColumna>, String>{
+    let mut df_en_memoria = state.dataframe.lock().map_err(|_| "No se pudo recuperar el df guardado en memoria".to_string())?;
     let mut nuevo_df = df_en_memoria.clone().ok_or_else(|| "Ocurrio un error").map_err(|e| format!("No se pudo sacar el df del muteguard: {e}"))?;
     for columna in cols.iter(){
         nuevo_df.rename(columna.0, columna.1.into()).map_err(|e| format!("El error {e}"));
     }
-    
-    println!("El dataframe {:?}", nuevo_df);
-    /*let df_modificado = nuevo_df.rename_many(iter_columnas).map_err(|e| format!("Fracasó la operación de cambio de nombres{e}"))?;
-    
-    let nombres: Vec<&PlSmallStr> = df_modificado
-        .get_column_names();
-        //.iter()
-        //.map(|s| s.to_owned())
-        //.collect();  
-
-    let mut df_nulls = df_modificado.clone().lazy()
-        .filter(
-            nombres
-                .iter()
-                .map(|c| col(c.to_string()).is_null())
-                .reduce(|acc, e| acc.and(e))
-                .ok_or_else(|| "La lista de columnas está vacía".to_string())?
-                .not()
-        ).collect()
-        .map_err(|e| format!("Fracasó la búsqueda de nulos {e}"))?;
-    println!("El df_mulls: {:?}", df_nulls);*/
     let (nuevo_esquema, df, nuevos_nombres) = obtener_esquema_columnas(&nuevo_df).map_err(|e| format!("Ocurrió un error al obtener el nuevo esquema {e}"))?;
-    println!("El nuevo esquema: {:?}. El nuevo df {:?} y los nuevos nombres {:?}", nuevo_esquema, df, nuevos_nombres);
-    //let columnas = nuevo_df.get_column_names();
-    //println!("Las columnas del nuevo df: {:?}", columnas);
-    //let esquema: Result<Vec<EsquemaColumna>, String> = obtener_esquema_columnas(&nuevo_df).0;
-    //println!("El esquema: {:?}", esquema);
-    //*el_dataframe = Some(nuevo_df);
-
-    Ok("No funcionó".to_string())
+    *df_en_memoria = Some(nuevo_df);
+    Ok(nuevo_esquema)
 }
 
