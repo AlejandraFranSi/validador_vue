@@ -11,17 +11,20 @@ const columnaPorEliminar = ref(null);
 const modalLoading = ref(false);
 const typeActions = {
   Texto: [
-    { accion: "Texto sin guiones", funcion: "sin_guiones" },
-    { accion: "Texto en minúsculas", funcion: "minuscula" },
-    { accion: "Texto capitalizado", funcion: "capitalizado" },
+    { accion: "Texto", funcion: "texto_plano", disabled: false },
+    { accion: "Texto sin guiones", funcion: "sin_guiones", disabled: false },
+    { accion: "Texto en minúsculas", funcion: "minuscula", disabled: false },
+    { accion: "Texto capitalizado", funcion: "capitalizado", disabled: false },
   ],
   Numérica: [
-    { accion: "Enteros", funcion: "enteros" },
-    { accion: "Dos decimales", funcion: "dos_decimales" },
-    { accion: "Porcentaje", funcion: "porcenaje" },
+    { accion: "Enteros", funcion: "enteros", disabled: true },
+    { accion: "Dos decimales", funcion: "dos_decimales", disabled: true },
+    { accion: "Porcentaje", funcion: "porcenaje", disabled: true },
   ],
-  Temporal: [{ accion: "ISO8601", funcion: "fecha_iso8601" }],
-  Coordenadas: [{ accion: "Coordenadas", funcion: "coordenadas" }],
+  Temporal: [{ accion: "ISO8601", funcion: "fecha_iso8601", disabled: true }],
+  Coordenadas: [
+    { accion: "Coordenadas", funcion: "coordenadas", disabled: true },
+  ],
 };
 
 const typeDict = {
@@ -137,7 +140,10 @@ const promoverCambios = async function () {
           &nbsp a:</label
         >
         <select :name="`nombre-columna-${index}`" :id="`tipo-columna-${index}`">
-          <option v-for="opcion in typeActions[columna.tipo]">
+          <option
+            v-for="opcion in typeActions[columna.tipo]"
+            :disabled="opcion['disabled']"
+          >
             {{ opcion.accion }}
           </option>
         </select>

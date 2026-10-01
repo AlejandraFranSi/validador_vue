@@ -14,6 +14,7 @@ use regex::Regex;
 use unicode_normalization::UnicodeNormalization;
 use std::sync::OnceLock;
 //use tauri::Manager;
+use inflector::Inflector;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 
@@ -377,6 +378,78 @@ fn eliminar_columna(columna: String, state: tauri::State<'_, ContenedorDatos>) -
     Ok(esquema)
 }
 
+
+/**
+ * Esta función recibe como argumento una columna y regresa otra columna con todos los valores en minúsculas
+ */
+fn str_to_lowercase(col_val: &Column) -> Column {
+    col_val.str()
+        .unwrap()
+        .iter()
+        .map(|opt_name: Option<&str>| {
+            opt_name.map(|name: &str| name.to_lowercase())
+         })
+        .collect::<StringChunked>()
+        .into_column()
+}
+
+/**
+ * Esta función recibe una columna como input y regresa una columna
+ * en la que todos los guiones bajos fueron sustituidos por espacios
+ */
+fn str_no_hyphen(col_val: &Column) -> Column {
+    col_val.str()
+        .unwrap()
+        .iter()
+        .map(|conjunto_filas: Option<&str>| {
+            conjunto_filas.map(|fila: &str| fila.replace("_", " "))
+         })
+        .collect::<StringChunked>()
+        .into_column()
+}
+
+/**
+ * 
+ */
+fn str_capitalize(col_val: &Column) -> Column {
+    col_val.str()
+        .unwrap()
+        .iter()
+        .map(|conjunto_filas: Option<&str>| {
+            conjunto_filas.map(|fila: &str| fila.to_title_case())
+         })
+        .collect::<StringChunked>()
+        .into_column()
+}
+
+
+
+/**
+ * Esta función solo es un placeholder para el match empleado en la transformación de columnas
+ */
+fn funcion_placeholder(col_val:&Column) -> Column{
+    col_val.to_owned()
+}
+
+/**
+ * Estas son las funciones que se pueden aplicar sobre las columnas
+ */
+fn apply_column_transform(action:&str) -> impl Fn(&Column) -> Column{ 
+    println!("El input es: {action}");
+     match action {
+        "texto_plano" => funcion_placeholder,
+        "minuscula" => str_to_lowercase,
+        "sin_guiones" => str_no_hyphen,
+        "capitalizado" => str_capitalize,
+        //"enteros" => println!("Se aplicará enteros a {:?}", col),
+        //"dos_decimales" => println!("Se aplicará dos_decimales a {:?}", col),
+        //"porcenaje" => println!("Se aplicará porcenaje a {:?}", col),
+        //"fecha_iso8601" => println!("Se aplicará fecha_iso8601 a {:?}", col),
+        //"coordenadas" => println!("Se aplicará coordenadas a {:?}", col),
+        _ => funcion_placeholder,
+    }
+}
+
 /**
  * Esta función cambia el nombre de las columnas según el input en el front. 
  * También aplica transformaciones sobre las columnas y actualiza el dataframe
@@ -384,13 +457,21 @@ fn eliminar_columna(columna: String, state: tauri::State<'_, ContenedorDatos>) -
  */
 #[tauri::command]
 fn transformar_columnas(cols: Vec<(&str, &str, &str)>, state: tauri::State<'_, ContenedorDatos>) -> Result<Vec<EsquemaColumna>, String>{
+    println!("Se promovieron cambios");
     let mut df_en_memoria = state.dataframe.lock().map_err(|_| "No se pudo recuperar el df guardado en memoria".to_string())?;
     let mut nuevo_df = df_en_memoria.clone().ok_or_else(|| "Ocurrio un error").map_err(|e| format!("No se pudo sacar el df del muteguard: {e}"))?;
     for columna in cols.iter(){
-        nuevo_df.rename(columna.0, columna.1.into()).map_err(|e| format!("El error {e}"));
+        let function_to_apply = apply_column_transform(columna.2);
+        nuevo_df.apply(columna.0, function_to_apply).map_err(|e| format!("Error al aplicar la transformación: {e}"))?;
+        nuevo_df.rename(columna.0, columna.1.into()).map_err(|e| format!("El error {e}"))?;
     }
-    let (nuevo_esquema, df, nuevos_nombres) = obtener_esquema_columnas(&nuevo_df).map_err(|e| format!("Ocurrió un error al obtener el nuevo esquema {e}"))?;
+    println!("El nuevo df: {:?}", nuevo_df);
+    let (nuevo_esquema, _df, _nuevos_nombres) = obtener_esquema_columnas(&nuevo_df).map_err(|e| format!("Ocurrió un error al obtener el nuevo esquema {e}"))?;
     *df_en_memoria = Some(nuevo_df);
     Ok(nuevo_esquema)
 }
+
+
+
+
 
