@@ -2,7 +2,7 @@
 import LimpiezaCSV from "./components/LimpiezaCSV.vue";
 import ConfiguracionDiccionarios from "./components/ConfiguracionDiccionarios.vue";
 import RevisionMetadatos from "./components/RevisionMetadatos.vue";
-import SideBar from "./components/SideBar.vue";
+import SideBar from "./components/base/SideBar.vue";
 import { useGlobalStore } from "./stores/global.js";
 
 const estadoGlobal = useGlobalStore();
@@ -41,18 +41,18 @@ body[data-perfil="predeterminada"],
   --color-neutro-1: #eaecec;
   --color-neutro-0: #ffffff;
 
-  --color-secundario-1: #edf9fcff;
-  --color-secundario-2: #ddedf3ff;
-  --color-secundario-3: #cee3eaff;
-  --color-secundario-4: #bad4e0ff;
-  --color-secundario-5: #a4c5d4ff;
-  --color-secundario-6: #8bb3c7ff;
-  --color-secundario-7: #7aa6beff;
-  --color-secundario-8: #6496b3ff;
-  --color-secundario-9: #5389a9ff;
-  --color-secundario-10: #357399ff;
-  --color-secundario-11: #1b5c89ff;
-  --color-secundario-12: #003e68ff;
+  --color-secundario-1: #e2dcde;
+  --color-secundario-2: #dad3d5;
+  --color-secundario-3: #af959f;
+  --color-secundario-4: #9f7c89;
+  --color-secundario-5: #8e6273;
+  --color-secundario-6: #7d495e;
+  --color-secundario-7: #6c3048;
+  --color-secundario-8: #5c263b;
+  --color-secundario-9: #521f33;
+  --color-secundario-10: #54162e;
+  --color-secundario-11: #611232;
+  --color-secundario-12: #520f2a;
 
   /*
   --color-primario-4: #2cb4b4ff;
@@ -60,10 +60,10 @@ body[data-perfil="predeterminada"],
   --color-primario-1: #fb5d01ff;
   --color-primario-2: #ea7a25;
   */
-  --color-primario-3: #e83151;
-  --color-primario-4: #f391a1;
-  --color-primario-1: #d8f6b7;
-  --color-primario-2: #b2ec6f;
+  --color-primario-3: #9a2246;
+  --color-primario-4: #751a35;
+  --color-primario-1: #916f27;
+  --color-primario-2: #a57f2c;
 
   --color-error-2: #f9c8cf;
   --color-confirmacion-2: #c2f5b5;

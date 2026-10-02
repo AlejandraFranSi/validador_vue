@@ -76,19 +76,19 @@ const isFileLoaded = computed(() =>
 <style lang="scss" scoped>
 .control-seccion {
   width: 100%;
-  background-color: var(--color-secundario-3);
+  background-color: var(--color-secundario-2);
 }
 button {
   border-radius: 0%;
-  background-color: var(--color-secundario-3);
-  border-left: solid 1px var(--color-secundario-5);
-  border-right: solid 1px var(--color-secundario-5);
+  background-color: var(--color-secundario-2);
+  border-left: solid 1px var(--color-secundario-7);
+  border-right: solid 1px var(--color-secundario-7);
 }
 
 button:disabled {
   background-color: var(--color-secundario-2);
 }
 .is-selected {
-  border-bottom: solid 5px var(--color-primario-3);
+  border-bottom: solid 5px var(--color-secundario-12);
 }
 </style>

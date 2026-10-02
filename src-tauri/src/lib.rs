@@ -382,6 +382,20 @@ fn eliminar_columna(columna: String, state: tauri::State<'_, ContenedorDatos>) -
 /**
  * Esta función recibe como argumento una columna y regresa otra columna con todos los valores en minúsculas
  */
+fn str_to_str(col_val: &Column) -> Column {
+    col_val.str()
+        .unwrap()
+        .iter()
+        .map(|opt_name: Option<&str>| {
+            opt_name.map(|name: &str| name.trim())
+         })
+        .collect::<StringChunked>()
+        .into_column()
+}
+
+/**
+ * Esta función recibe como argumento una columna y regresa otra columna con todos los valores en minúsculas
+ */
 fn str_to_lowercase(col_val: &Column) -> Column {
     col_val.str()
         .unwrap()
@@ -422,6 +436,65 @@ fn str_capitalize(col_val: &Column) -> Column {
         .into_column()
 }
 
+fn num_no_comas(col_val: &Column) -> Column {
+    col_val.str()
+        .unwrap()
+        .iter()
+        .map(|conjunto_filas: Option<&str>| {
+            conjunto_filas.map(|fila: &str| fila.replace(",", "").parse::<f64>().expect("Could not convert"))
+         })
+        .collect::<Float64Chunked>()
+        .into_column()
+}
+
+fn str_to_prctg_100_1(col_val: &Column) -> Column {
+    col_val.str()
+        .unwrap()
+        .iter()
+        .map(|conjunto_filas: Option<&str>| {
+            conjunto_filas.map(|fila: &str| {
+                let x =fila.replace("%", "").parse::<f64>().expect("Could not convert");
+                x / 100.0
+            })
+         })
+        .collect::<Float64Chunked>()
+        .into_column()
+}
+
+fn num_to_int(col_val: &Column) -> Column {
+    col_val.f64()
+        .unwrap()
+        .iter()
+        .map(|conjunto_filas: Option<f64>| {
+            conjunto_filas.map(|fila: f64| fila.round() as i64)
+         })
+        .collect::<Int64Chunked>()
+        .into_column()
+}
+
+fn num_two_decimals(col_val: &Column) -> Column {
+    col_val.f64()
+        .unwrap()
+        .iter()
+        .map(|conjunto_filas: Option<f64>| {
+            conjunto_filas.map(|fila: f64| {
+                let cadena =fila.to_string();
+                let new_string = match cadena.split_once('.') {
+                    Some((entera, decimal)) => {
+                        let dos: String = decimal.chars().take(2).collect();
+                        format!("{}.{:0<2}", entera, dos)
+                    }
+                    None => format!("{}.00", cadena),
+                };
+                new_string.parse::<f64>().expect("Could not convert")
+            })
+         })
+        .collect::<Float64Chunked>()
+        .into_column()
+}
+
+
+
 
 
 /**
@@ -437,12 +510,15 @@ fn funcion_placeholder(col_val:&Column) -> Column{
 fn apply_column_transform(action:&str) -> impl Fn(&Column) -> Column{ 
     println!("El input es: {action}");
      match action {
-        "texto_plano" => funcion_placeholder,
+        "texto_plano" => str_to_str,
         "minuscula" => str_to_lowercase,
         "sin_guiones" => str_no_hyphen,
         "capitalizado" => str_capitalize,
-        //"enteros" => println!("Se aplicará enteros a {:?}", col),
-        //"dos_decimales" => println!("Se aplicará dos_decimales a {:?}", col),
+        "num_sin_comas" => num_no_comas,
+        "str_to_prctg_a_1" => str_to_prctg_100_1,
+        "numerico" => funcion_placeholder,
+        "enteros" => num_to_int,
+        "dos_decimales" => num_two_decimals,
         //"porcenaje" => println!("Se aplicará porcenaje a {:?}", col),
         //"fecha_iso8601" => println!("Se aplicará fecha_iso8601 a {:?}", col),
         //"coordenadas" => println!("Se aplicará coordenadas a {:?}", col),
@@ -465,7 +541,6 @@ fn transformar_columnas(cols: Vec<(&str, &str, &str)>, state: tauri::State<'_, C
         nuevo_df.apply(columna.0, function_to_apply).map_err(|e| format!("Error al aplicar la transformación: {e}"))?;
         nuevo_df.rename(columna.0, columna.1.into()).map_err(|e| format!("El error {e}"))?;
     }
-    println!("El nuevo df: {:?}", nuevo_df);
     let (nuevo_esquema, _df, _nuevos_nombres) = obtener_esquema_columnas(&nuevo_df).map_err(|e| format!("Ocurrió un error al obtener el nuevo esquema {e}"))?;
     *df_en_memoria = Some(nuevo_df);
     Ok(nuevo_esquema)

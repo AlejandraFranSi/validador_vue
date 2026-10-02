@@ -1,5 +1,5 @@
 <script setup>
-import { useGlobalStore } from "../stores/global.js";
+import { useGlobalStore } from "../../stores/global";
 const estadoGlobal = useGlobalStore();
 </script>
 <template>
@@ -9,7 +9,7 @@ const estadoGlobal = useGlobalStore();
     </div>
     <div class="secciones m-t-3">
       <button
-        class="boton-chico"
+        class="boton-chico boton-seccion"
         :class="
           estadoGlobal.seccionSeleccionada === 'metadatos'
             ? 'is-selected'
@@ -20,7 +20,7 @@ const estadoGlobal = useGlobalStore();
         Metadatos
       </button>
       <button
-        class="boton-chico"
+        class="boton-chico boton-seccion"
         :class="
           estadoGlobal.seccionSeleccionada === 'diccionario'
             ? 'is-selected'
@@ -31,13 +31,23 @@ const estadoGlobal = useGlobalStore();
         Diccionario
       </button>
       <button
-        class="boton-chico"
+        class="boton-chico boton-seccion"
         :class="
           estadoGlobal.seccionSeleccionada === 'limpieza' ? 'is-selected' : null
         "
         @click="estadoGlobal.actualizarVista('limpieza', 'carga')"
       >
         Limpieza de datos
+      </button>
+    </div>
+
+    <div class="botones-accion m-t-5 flex flex-contenido-centrado p-0">
+      <button class="m-x-2 m-y-0 boton-chico boton-primario">
+        Exportar CVS
+      </button>
+      <button class="m-x-2 m-y-0 boton-chico boton-primario">Subir a SI</button>
+      <button class="m-x-2 m-y-0 boton-chico boton-primario">
+        Generar reporte
       </button>
     </div>
   </div>
@@ -62,19 +72,19 @@ const estadoGlobal = useGlobalStore();
   font-size: 18px;
   text-align: center;
 }
-button {
+.boton-seccion {
   background-color: var(--color-secundario-12);
   color: var(--color-neutro-1);
   width: 100%;
   border-radius: 0%;
-  border-bottom: solid 1px var(--color-primario-4);
+  border-bottom: solid 1px var(--color-secundario-4);
   text-align: left;
 }
 button:hover {
-  background-color: var(--color-secundario-9);
+  background-color: var(--color-secundario-8);
 }
 .is-selected {
-  border-left: solid 5px var(--color-primario-4);
+  border-left: solid 5px var(--color-secundario-4);
 }
 
 @media (max-width: 800px) {
