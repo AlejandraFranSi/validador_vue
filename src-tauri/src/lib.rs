@@ -24,7 +24,7 @@ pub fn run() {
          .manage(ContenedorDatos { 
             dataframe: Mutex::new(None),
         })
-        .invoke_handler(tauri::generate_handler![leer_csv, fetch_rows, eliminar_columna, transformar_columnas, obtener_valores_categoricos])
+        .invoke_handler(tauri::generate_handler![leer_csv, fetch_rows, eliminar_columna, transformar_columnas, obtener_valores_categoricos, actualizar_categorias])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -238,9 +238,27 @@ fn obtener_valores_categoricos(columna: String, state: State<'_, ContenedorDatos
     let mut buf = Vec::new();
     JsonWriter::new(&mut buf).with_json_format(JsonFormat::Json).finish(&mut valores_lista.clone()).map_err(|e| format!("Error de formato al escribir JSON: {}", e))?;
     let rows: Value = serde_json::from_slice(&buf).map_err(|e| format!("Error al estructurar el JSON: {}", e))?;
-    println!("{:?}", rows);
     Ok(rows)    
 }
+
+/**
+ * 
+ */
+#[tauri::command]
+fn actualizar_categorias(cols: Vec<(&str, &str, &str)>){
+    println!("Se disparó la función de actualizar categorías");
+    println!("{:?}", cols);
+    //El primer argumento es la columna, el segundo el valor original y el tercero el valor a remplazar
+    /*col_val.str()
+        .unwrap()
+        .iter()
+        .map(|conjunto_filas: Option<&str>| {
+            conjunto_filas.map(|fila: &str| fila.replace("_", " "))
+         })
+        .collect::<StringChunked>()
+        .into_column()*/
+}
+
 /**
  * Esta función se encarga de leer el archivo y crear el dataframe. Para ello ocurren varias cosas:
  * 1. Primero lee únicamente una parte del archivo para identificar el encoding.
@@ -252,7 +270,7 @@ fn obtener_valores_categoricos(columna: String, state: State<'_, ContenedorDatos
  * 4. Se construye un DataFrame a partir del vector
  * 5. Se guarda el Dataframe en el estado global de tauri
  */
-#[tauri::command]
+ #[tauri::command]
 fn leer_csv(ruta_front: String, state: State<'_, ContenedorDatos>) -> Result<ReporteCsv, String>{
     let ruta = ruta_front;
     let directorio: Vec<&str> = ruta.split('\\').collect();

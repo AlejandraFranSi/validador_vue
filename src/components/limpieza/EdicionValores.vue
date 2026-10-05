@@ -1,6 +1,7 @@
 <script setup>
-import { onMounted, computed, ref } from "vue";
+import * as d3 from "d3";
 import TablaCSV from "../base/TablaCSV.vue";
+import { onMounted, computed, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useDataStore } from "../../stores/data.js";
 
@@ -10,18 +11,43 @@ const esquemaColumnas = computed(() =>
 );
 const columnaSeleccionada = ref(null);
 const dataCategorica = ref(null);
+const datum = ref();
 const isLoading = ref(false);
 
 async function seleccionarColumna(columna_seleccionada) {
   isLoading.value = true;
-  console.log(columnaSeleccionada);
   columnaSeleccionada.value = columna_seleccionada.nombre;
   dataCategorica.value = await invoke("obtener_valores_categoricos", {
     columna: columna_seleccionada.nombre,
   });
-  console.log("Aqui está la prueba: ", dataCategorica.value);
+  datum.value = dataCategorica.value.map((d) => {
+    let entrada = {
+      Original: d[columnaSeleccionada.value],
+      Nuevo: d[columnaSeleccionada.value],
+      Repeticiones: d.count,
+    };
+    return entrada;
+  });
   isLoading.value = false;
 }
+
+async function promoverCambios() {
+  for (let i in datum.value) {
+    if (datum.value[i]["Original"] !== datum.value[i]["Nuevo"]) {
+      const lista = [
+        [
+          columnaSeleccionada.value,
+          datum.value[i]["Original"],
+          datum.value[i]["Nuevo"],
+        ],
+      ];
+      await invoke("actualizar_categorias", {
+        cols: lista,
+      });
+    }
+  }
+}
+
 onMounted(async () => {
   if (esquemaColumnas.value) {
     await seleccionarColumna(esquemaColumnas.value[0]);
@@ -61,29 +87,30 @@ onMounted(async () => {
       <table class="columna-10">
         <thead class="header-tabla">
           <tr>
-            <th>Original</th>
-            <th>Nuevo (editable)</th>
-            <th>Repeticiones</th>
+            <th v-for="columna in Object.keys(datum[0])">{{ columna }}</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="fila in dataCategorica">
-            <td>{{ fila[columnaSeleccionada] }}</td>
+          <tr v-for="fila in datum">
+            <td>{{ fila["Original"] }}</td>
             <td>
               <input
                 type="text"
                 :id="`fila-${dataCategorica.indexOf(fila)}`"
                 :name="`fila-${dataCategorica.indexOf(fila)}`"
-                :value="fila[columnaSeleccionada]"
+                :value="fila['Nuevo']"
+                v-model="fila['Nuevo']"
               />
             </td>
-            <td>{{ fila["count"] }}</td>
+            <td>{{ fila["Repeticiones"] }}</td>
           </tr>
         </tbody>
       </table>
     </div>
     <div class="flex flex-contenido-final columna-16">
-      <button class="boton-primario boton-chico">Promover Cambios</button>
+      <button class="boton-primario boton-chico" @click="promoverCambios">
+        Promover Cambios
+      </button>
     </div>
   </div>
 
