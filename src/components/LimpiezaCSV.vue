@@ -5,8 +5,11 @@ import EdicionValores from "./limpieza/EdicionValores.vue";
 import ValidacionColumnas from "./limpieza/ValidacionColumnas.vue";
 import { computed } from "vue";
 import { useGlobalStore } from "../stores/global.js";
+import { useDataStore } from "../stores/data.js";
 
 const estadoGlobal = useGlobalStore();
+const dataStore = useDataStore();
+
 const isFileLoaded = computed(() =>
   estadoGlobal.statusArchivo === "Sin archivo cargado" ? false : true,
 );
@@ -42,7 +45,7 @@ const isFileLoaded = computed(() =>
             : null
         "
         @click="estadoGlobal.actualizarVista('limpieza', 'columnas')"
-        :disabled="!isFileLoaded"
+        :disabled="!dataStore.absolutePath"
       >
         Validación de columnas
       </button>
@@ -53,7 +56,7 @@ const isFileLoaded = computed(() =>
             : null
         "
         @click="estadoGlobal.actualizarVista('limpieza', 'valores')"
-        :disabled="!isFileLoaded"
+        :disabled="!dataStore.absolutePath"
       >
         Edición de valores
       </button>
@@ -83,6 +86,7 @@ button {
   background-color: var(--color-secundario-2);
   border-left: solid 1px var(--color-secundario-7);
   border-right: solid 1px var(--color-secundario-7);
+  color: var(--color-secundario-9);
 }
 
 button:disabled {

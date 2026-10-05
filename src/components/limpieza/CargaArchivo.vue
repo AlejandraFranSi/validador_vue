@@ -38,6 +38,35 @@ const irAValidacion = function(){
   estadoGlobal.actualizarVista('limpieza', 'columnas')
 }
 
+const validarCriterios = function () {
+  let listaErrores = [];
+  console.log("En la vista de carga", estadoData.esquema);
+  if(estadoData.esquema.caracteresCorruptos.length > 0){
+    listaErrores.push("error_4.3")
+    listaErrores.push("error_15.1")
+  }
+  
+  if(estadoData.esquema.conNombresColumnasRepetidos){
+    listaErrores.push("error_18")
+  }
+
+  if(estadoData.esquema.encoding != 'UTF-8'){
+    listaErrores.push('error_2')
+  }
+
+  if(estadoData.esquema.filas_vacias > 0){
+    listaErrores.push("error_23")
+  }
+
+  if(estadoData.esquema.hayFilasRepetidas){
+    listaErrores.push("error_11")
+  }
+
+  if(estadoData.esquema.sep_coma){
+    listaErrores.push("error_3")
+  }
+};
+
 onMounted(() => {
   dropZoneText.value = estadoData.absolutePath
     ? `Archivo actual: ${estadoData.absolutePath}`
@@ -53,6 +82,7 @@ onMounted(() => {
       dropZone.classed("dragover", false);
       dropZoneText.value = `Archivo actual: ${estadoData.absolutePath}`;
       await estadoData.readCSV();
+      validarCriterios();
     } else {
       // En caso de que al final no se haga nada
       dropZone.classed("dragover", false);

@@ -15,16 +15,7 @@ const typeActions = {
     { accion: "Texto sin guiones", funcion: "sin_guiones", disabled: false },
     { accion: "Texto en minúsculas", funcion: "minuscula", disabled: false },
     { accion: "Texto capitalizado", funcion: "capitalizado", disabled: false },
-    {
-      accion: "Numérico sin comas",
-      funcion: "num_sin_comas",
-      disabled: false,
-    },
-    {
-      accion: "Porcentaje de 100 a 1",
-      funcion: "str_to_prctg_a_1",
-      disabled: false,
-    },
+    { accion: "Numérico", funcion: "str_to_num", disabled: false },
   ],
   Numérica: [
     { accion: "Numérico", funcion: "numerico", disabled: false },

@@ -436,30 +436,23 @@ fn str_capitalize(col_val: &Column) -> Column {
         .into_column()
 }
 
-fn num_no_comas(col_val: &Column) -> Column {
-    col_val.str()
-        .unwrap()
-        .iter()
-        .map(|conjunto_filas: Option<&str>| {
-            conjunto_filas.map(|fila: &str| fila.replace(",", "").parse::<f64>().expect("Could not convert"))
-         })
-        .collect::<Float64Chunked>()
-        .into_column()
-}
-
-fn str_to_prctg_100_1(col_val: &Column) -> Column {
+fn str_to_num(col_val: &Column) -> Column {
+    let mut not_permited = vec![",", "%", "$", "€", "£", "¥"];
     col_val.str()
         .unwrap()
         .iter()
         .map(|conjunto_filas: Option<&str>| {
             conjunto_filas.map(|fila: &str| {
-                let x =fila.replace("%", "").parse::<f64>().expect("Could not convert");
-                x / 100.0
-            })
+                let mut new_str:String = fila.to_owned();
+                for i in &mut not_permited {
+                        new_str = new_str.replace(*i, "")
+                    }
+                new_str.parse::<f64>().expect("Could not convert")})
          })
         .collect::<Float64Chunked>()
         .into_column()
 }
+
 
 fn num_to_int(col_val: &Column) -> Column {
     col_val.f64()
@@ -471,30 +464,6 @@ fn num_to_int(col_val: &Column) -> Column {
         .collect::<Int64Chunked>()
         .into_column()
 }
-
-fn num_two_decimals(col_val: &Column) -> Column {
-    col_val.f64()
-        .unwrap()
-        .iter()
-        .map(|conjunto_filas: Option<f64>| {
-            conjunto_filas.map(|fila: f64| {
-                let cadena =fila.to_string();
-                let new_string = match cadena.split_once('.') {
-                    Some((entera, decimal)) => {
-                        let dos: String = decimal.chars().take(2).collect();
-                        format!("{}.{:0<2}", entera, dos)
-                    }
-                    None => format!("{}.00", cadena),
-                };
-                new_string.parse::<f64>().expect("Could not convert")
-            })
-         })
-        .collect::<Float64Chunked>()
-        .into_column()
-}
-
-
-
 
 
 /**
@@ -514,11 +483,9 @@ fn apply_column_transform(action:&str) -> impl Fn(&Column) -> Column{
         "minuscula" => str_to_lowercase,
         "sin_guiones" => str_no_hyphen,
         "capitalizado" => str_capitalize,
-        "num_sin_comas" => num_no_comas,
-        "str_to_prctg_a_1" => str_to_prctg_100_1,
+        "str_to_num" => str_to_num,
         "numerico" => funcion_placeholder,
         "enteros" => num_to_int,
-        "dos_decimales" => num_two_decimals,
         //"porcenaje" => println!("Se aplicará porcenaje a {:?}", col),
         //"fecha_iso8601" => println!("Se aplicará fecha_iso8601 a {:?}", col),
         //"coordenadas" => println!("Se aplicará coordenadas a {:?}", col),

@@ -95,6 +95,7 @@ export const useDataStore = defineStore("data", () => {
         filas_vacias: data_csv.null_rows,
         sep_coma: data_csv.sep_by_coma,
       };
+      console.log(esquema.value);
       await fetchNextRows();
       dataStatus.value.wasFetchingSuccesfull = true;
     } catch (error) {
