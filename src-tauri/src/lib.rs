@@ -24,7 +24,7 @@ pub fn run() {
          .manage(ContenedorDatos { 
             dataframe: Mutex::new(None),
         })
-        .invoke_handler(tauri::generate_handler![leer_csv, fetch_rows, eliminar_columna, transformar_columnas])
+        .invoke_handler(tauri::generate_handler![leer_csv, fetch_rows, eliminar_columna, transformar_columnas, obtener_valores_categoricos])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -46,6 +46,7 @@ pub struct EsquemaColumna {
     pub nombre: String,
     pub nombre_sugerido: String,
     pub tipo: String,
+    pub valores_unicos: usize,
     pub incidencia: bool,
     pub errores: Vec<String>,
 }
@@ -196,8 +197,9 @@ fn obtener_esquema_columnas(df: &DataFrame) -> Result<(Vec <EsquemaColumna>,Data
         let incidencia: bool = propiedades.incidencia;
         let errores: Vec<String> = propiedades.errores;
         let column = df_nulls.column(&nombre).unwrap().clone();
-        let mut tipo: String;
+        let valores_unicos = column.n_unique().map_err(|e|format!("No se pudo obtener el número de categorías: {}", e))?;
 
+        let mut tipo: String;
         let parsed_as_datetime = column.as_materialized_series().date();
         if parsed_as_datetime.is_ok() {
             let parsed_column = column.as_materialized_series().date().unwrap().clone().into_column();
@@ -209,6 +211,7 @@ fn obtener_esquema_columnas(df: &DataFrame) -> Result<(Vec <EsquemaColumna>,Data
                 let parsed_column = parsed_as_float.unwrap().clone().into_column();
                 df_nulls.replace(&nombre, parsed_column);
                 tipo = "Numérica".to_string();
+    
             } else { 
                 let parsed_as_int = column.as_materialized_series().i64();
                 if parsed_as_int.is_ok(){
@@ -220,12 +223,24 @@ fn obtener_esquema_columnas(df: &DataFrame) -> Result<(Vec <EsquemaColumna>,Data
                 }
             }
         }
-        esquema_columnas.push(EsquemaColumna{nombre, nombre_sugerido, incidencia, tipo, errores});
+
+        esquema_columnas.push(EsquemaColumna{nombre, nombre_sugerido, tipo, valores_unicos, incidencia, errores});
     }
     Ok((esquema_columnas, df_nulls, nombres))
 }
 
-
+#[tauri::command]
+fn obtener_valores_categoricos(columna: String, state: State<'_, ContenedorDatos>)-> Result<Value,String>{
+    let mut guardado = state.dataframe.lock().map_err(|_| "Error al bloquear el estado")?;
+    let df = guardado.as_mut().ok_or("No hay dataframe")?;
+    let columna_seleccionada = df.column(&columna).map_err(|e| format!("No se pudo obtener la columna {e}"))?;
+    let valores_lista = columna_seleccionada.as_materialized_series().value_counts(true, true, "count".into(), false).map_err(|e| format!("No se pudo obtener la lista de valores únicos {e}"))?;
+    let mut buf = Vec::new();
+    JsonWriter::new(&mut buf).with_json_format(JsonFormat::Json).finish(&mut valores_lista.clone()).map_err(|e| format!("Error de formato al escribir JSON: {}", e))?;
+    let rows: Value = serde_json::from_slice(&buf).map_err(|e| format!("Error al estructurar el JSON: {}", e))?;
+    println!("{:?}", rows);
+    Ok(rows)    
+}
 /**
  * Esta función se encarga de leer el archivo y crear el dataframe. Para ello ocurren varias cosas:
  * 1. Primero lee únicamente una parte del archivo para identificar el encoding.
@@ -380,14 +395,15 @@ fn eliminar_columna(columna: String, state: tauri::State<'_, ContenedorDatos>) -
 
 
 /**
- * Esta función recibe como argumento una columna y regresa otra columna con todos los valores en minúsculas
+ * Esta función recibe como argumento una columna y regresa otra columna con todos los 
+ * textos con masyúsculas después de un punto.
  */
 fn str_to_str(col_val: &Column) -> Column {
     col_val.str()
         .unwrap()
         .iter()
         .map(|opt_name: Option<&str>| {
-            opt_name.map(|name: &str| name.trim())
+            opt_name.map(|name: &str| name.trim().to_sentence_case())
          })
         .collect::<StringChunked>()
         .into_column()
@@ -423,7 +439,8 @@ fn str_no_hyphen(col_val: &Column) -> Column {
 }
 
 /**
- * 
+ * Esta función recibe una columna como input y regresa una columna
+ * en la que la primera letra de cada palabra está en mayúsculas
  */
 fn str_capitalize(col_val: &Column) -> Column {
     col_val.str()
@@ -436,6 +453,10 @@ fn str_capitalize(col_val: &Column) -> Column {
         .into_column()
 }
 
+/**
+ * Esta función recibe una columna como input y regresa una columna
+ * sin valores especiales como simbolos de modena y sin comas, con tipo numérico
+ */
 fn str_to_num(col_val: &Column) -> Column {
     let mut not_permited = vec![",", "%", "$", "€", "£", "¥"];
     col_val.str()
@@ -454,6 +475,22 @@ fn str_to_num(col_val: &Column) -> Column {
 }
 
 
+/**
+ * Esta función recibe una columna como input y regresa una columna
+ * con tipo fecha. El input esperado es día-mes-anio
+ */
+fn str_to_date(col_val: &Column) -> Column {
+    col_val.str()
+        .unwrap()
+        .as_date(Some("%d-%m-%y"), false)                   
+        .unwrap()
+        .into_column()
+}
+
+/**
+ * Esta función recibe una columna como input y regresa una columna
+ * con números enteros.
+ */
 fn num_to_int(col_val: &Column) -> Column {
     col_val.f64()
         .unwrap()
@@ -477,16 +514,15 @@ fn funcion_placeholder(col_val:&Column) -> Column{
  * Estas son las funciones que se pueden aplicar sobre las columnas
  */
 fn apply_column_transform(action:&str) -> impl Fn(&Column) -> Column{ 
-    println!("El input es: {action}");
      match action {
-        "texto_plano" => str_to_str,
+        "texto_plano" => funcion_placeholder,
         "minuscula" => str_to_lowercase,
         "sin_guiones" => str_no_hyphen,
         "capitalizado" => str_capitalize,
         "str_to_num" => str_to_num,
+        "str_to_date" => str_to_date,
         "numerico" => funcion_placeholder,
         "enteros" => num_to_int,
-        //"porcenaje" => println!("Se aplicará porcenaje a {:?}", col),
         //"fecha_iso8601" => println!("Se aplicará fecha_iso8601 a {:?}", col),
         //"coordenadas" => println!("Se aplicará coordenadas a {:?}", col),
         _ => funcion_placeholder,
@@ -500,7 +536,6 @@ fn apply_column_transform(action:&str) -> impl Fn(&Column) -> Column{
  */
 #[tauri::command]
 fn transformar_columnas(cols: Vec<(&str, &str, &str)>, state: tauri::State<'_, ContenedorDatos>) -> Result<Vec<EsquemaColumna>, String>{
-    println!("Se promovieron cambios");
     let mut df_en_memoria = state.dataframe.lock().map_err(|_| "No se pudo recuperar el df guardado en memoria".to_string())?;
     let mut nuevo_df = df_en_memoria.clone().ok_or_else(|| "Ocurrio un error").map_err(|e| format!("No se pudo sacar el df del muteguard: {e}"))?;
     for columna in cols.iter(){

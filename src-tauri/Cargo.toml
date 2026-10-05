@@ -30,3 +30,4 @@ polars = { version = "0.55.1", features = ["lazy", "temporal", "describe", "json
 regex = "1"
 unicode-normalization = "0.1"
 Inflector = "0.11.4"
+chrono = "0.4.45"

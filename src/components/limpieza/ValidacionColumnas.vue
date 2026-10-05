@@ -16,12 +16,11 @@ const typeActions = {
     { accion: "Texto en minúsculas", funcion: "minuscula", disabled: false },
     { accion: "Texto capitalizado", funcion: "capitalizado", disabled: false },
     { accion: "Numérico", funcion: "str_to_num", disabled: false },
+    { accion: "Fecha", funcion: "str_to_date", disabled: false },
   ],
   Numérica: [
     { accion: "Numérico", funcion: "numerico", disabled: false },
     { accion: "Enteros", funcion: "enteros", disabled: false },
-    { accion: "Dos decimales", funcion: "dos_decimales", disabled: true },
-    { accion: "Porcentaje", funcion: "porcenaje", disabled: true },
   ],
   Temporal: [{ accion: "ISO8601", funcion: "fecha_iso8601", disabled: true }],
   Coordenadas: [
@@ -152,7 +151,7 @@ const promoverCambios = async function () {
       </div>
     </div>
   </div>
-  <button class="boton-primario m-t-2" @click="promoverCambios">
+  <button class="boton-primario boton-chico m-t-2" @click="promoverCambios">
     Promover cambios
   </button>
 
