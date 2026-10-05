@@ -115,9 +115,6 @@ onMounted(async () => {
   </div>
 
   <TablaCSV />
-
-  <h2>Editor de valores</h2>
-  <p>Da click en la columna con la que deseas trabajar:</p>
 </template>
 <style scoped>
 .tabla-columnas {

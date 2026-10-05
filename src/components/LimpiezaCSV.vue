@@ -91,6 +91,7 @@ button {
 
 button:disabled {
   background-color: var(--color-secundario-2);
+  color: var(--color-secundario-4);
 }
 .is-selected {
   border-bottom: solid 5px var(--color-secundario-12);
