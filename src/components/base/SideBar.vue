@@ -1,6 +1,31 @@
 <script setup>
 import { useGlobalStore } from "../../stores/global";
+import { useDataStore } from "../../stores/data";
+import { invoke } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
+
 const estadoGlobal = useGlobalStore();
+const dataStore = useDataStore();
+
+async function exportarCSV() {
+  const ruta = await save({
+    title: "Guardar CSV",
+    defaultPath: dataStore.rutaSugerida,
+    filters: [
+      {
+        name: "CSV",
+        extensions: ["csv"],
+      },
+    ],
+  });
+  console.log("La ruta: ", ruta);
+  if (!ruta) {
+    return;
+  }
+
+  await invoke("exportar_csv", { ruta });
+  alert("Archivo exportado");
+}
 </script>
 <template>
   <div class="sidebar">
@@ -42,11 +67,17 @@ const estadoGlobal = useGlobalStore();
     </div>
 
     <div class="botones-accion m-t-5 flex flex-contenido-centrado p-0">
-      <button class="m-x-2 m-y-0 boton-chico boton-primario">
+      <button
+        class="m-x-2 m-y-0 boton-chico boton-primario"
+        @click="exportarCSV"
+        :disabled="!dataStore.absolutePath"
+      >
         Exportar CVS
       </button>
-      <button class="m-x-2 m-y-0 boton-chico boton-primario">Subir a SI</button>
-      <button class="m-x-2 m-y-0 boton-chico boton-primario">
+      <button class="m-x-2 m-y-0 boton-chico boton-primario" disabled>
+        Subir a SI
+      </button>
+      <button class="m-x-2 m-y-0 boton-chico boton-primario" disabled>
         Generar reporte
       </button>
     </div>

@@ -13,6 +13,7 @@
     "@centrogeomx/sisdai-componentes": "^4.14.1",
     "@centrogeomx/sisdai-css": "^1.10.2",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.8.1",
     "@tauri-apps/plugin-opener": "^2",
     "d3": "^7.9.0",
     "pinia": "^3.0.4",

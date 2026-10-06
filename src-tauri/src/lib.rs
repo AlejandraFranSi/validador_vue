@@ -20,11 +20,12 @@ use inflector::Inflector;
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
          .manage(ContenedorDatos { 
             dataframe: Mutex::new(None),
         })
-        .invoke_handler(tauri::generate_handler![leer_csv, fetch_rows, eliminar_columna, transformar_columnas, obtener_valores_categoricos, actualizar_categorias])
+        .invoke_handler(tauri::generate_handler![leer_csv, fetch_rows, eliminar_columna, transformar_columnas, obtener_valores_categoricos, actualizar_categorias, exportar_csv])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -229,36 +230,6 @@ fn obtener_esquema_columnas(df: &DataFrame) -> Result<(Vec <EsquemaColumna>,Data
     Ok((esquema_columnas, df_nulls, nombres))
 }
 
-#[tauri::command]
-fn obtener_valores_categoricos(columna: String, state: State<'_, ContenedorDatos>)-> Result<Value,String>{
-    let mut guardado = state.dataframe.lock().map_err(|_| "Error al bloquear el estado")?;
-    let df = guardado.as_mut().ok_or("No hay dataframe")?;
-    let columna_seleccionada = df.column(&columna).map_err(|e| format!("No se pudo obtener la columna {e}"))?;
-    let valores_lista = columna_seleccionada.as_materialized_series().value_counts(true, true, "count".into(), false).map_err(|e| format!("No se pudo obtener la lista de valores únicos {e}"))?;
-    let mut buf = Vec::new();
-    JsonWriter::new(&mut buf).with_json_format(JsonFormat::Json).finish(&mut valores_lista.clone()).map_err(|e| format!("Error de formato al escribir JSON: {}", e))?;
-    let rows: Value = serde_json::from_slice(&buf).map_err(|e| format!("Error al estructurar el JSON: {}", e))?;
-    Ok(rows)    
-}
-
-/**
- * 
- */
-#[tauri::command]
-fn actualizar_categorias(cols: Vec<(&str, &str, &str)>){
-    println!("Se disparó la función de actualizar categorías");
-    println!("{:?}", cols);
-    //El primer argumento es la columna, el segundo el valor original y el tercero el valor a remplazar
-    /*col_val.str()
-        .unwrap()
-        .iter()
-        .map(|conjunto_filas: Option<&str>| {
-            conjunto_filas.map(|fila: &str| fila.replace("_", " "))
-         })
-        .collect::<StringChunked>()
-        .into_column()*/
-}
-
 /**
  * Esta función se encarga de leer el archivo y crear el dataframe. Para ello ocurren varias cosas:
  * 1. Primero lee únicamente una parte del archivo para identificar el encoding.
@@ -413,21 +384,6 @@ fn eliminar_columna(columna: String, state: tauri::State<'_, ContenedorDatos>) -
 
 
 /**
- * Esta función recibe como argumento una columna y regresa otra columna con todos los 
- * textos con masyúsculas después de un punto.
- */
-fn str_to_str(col_val: &Column) -> Column {
-    col_val.str()
-        .unwrap()
-        .iter()
-        .map(|opt_name: Option<&str>| {
-            opt_name.map(|name: &str| name.trim().to_sentence_case())
-         })
-        .collect::<StringChunked>()
-        .into_column()
-}
-
-/**
  * Esta función recibe como argumento una columna y regresa otra columna con todos los valores en minúsculas
  */
 fn str_to_lowercase(col_val: &Column) -> Column {
@@ -566,7 +522,61 @@ fn transformar_columnas(cols: Vec<(&str, &str, &str)>, state: tauri::State<'_, C
     Ok(nuevo_esquema)
 }
 
+#[tauri::command]
+fn obtener_valores_categoricos(columna: String, state: State<'_, ContenedorDatos>)-> Result<Value,String>{
+    let mut guardado = state.dataframe.lock().map_err(|_| "Error al bloquear el estado")?;
+    let df = guardado.as_mut().ok_or("No hay dataframe")?;
+    let columna_seleccionada = df.column(&columna).map_err(|e| format!("No se pudo obtener la columna {e}"))?;
+    let valores_lista = columna_seleccionada.as_materialized_series().value_counts(true, true, "count".into(), false).map_err(|e| format!("No se pudo obtener la lista de valores únicos {e}"))?;
+    let mut buf = Vec::new();
+    JsonWriter::new(&mut buf).with_json_format(JsonFormat::Json).finish(&mut valores_lista.clone()).map_err(|e| format!("Error de formato al escribir JSON: {}", e))?;
+    let rows: Value = serde_json::from_slice(&buf).map_err(|e| format!("Error al estructurar el JSON: {}", e))?;
+    Ok(rows)    
+}
 
+/**
+ * Esta función toma el dataframe almacenado en memoria, toma la columna que se indica como argumento y cambia una cadena por otra.
+ * Así, se modifica directamente el dataframe en memoria.
+ */
+#[tauri::command]
+fn actualizar_categorias(cols: Vec<(&str, &str, &str)>, state: State<'_, ContenedorDatos>) -> Result<Vec<EsquemaColumna>, String>{
+    let mut el_dataframe = state.dataframe.lock().map_err(|_| "No se pudieron recuperar las filas".to_string())?;
+    let mut unwraped_df =  el_dataframe.clone().ok_or_else(|| "Ocurrio un error").map_err(|e| format!("No se pudo sacar el df del muteguard: {e}"))?;
+    for (nombre_columna, original, nuevo) in cols {
+        unwraped_df.apply(nombre_columna,|col: &Column| col.str()
+            .unwrap()
+            .iter()
+            .map(|conjunto_filas: Option<&str>| {
+                conjunto_filas.map(|fila: &str| fila.replace(original, nuevo))
+            })
+            .collect::<StringChunked>()
+            .into_column()).map_err(|e| format!("Error al aplicar la transformación: {e}"))?;
+    }
+    let (nuevo_esquema, _df, _nuevos_nombres) = obtener_esquema_columnas(&unwraped_df).map_err(|e| format!("Ocurrió un error al obtener el nuevo esquema {e}"))?;
+    *el_dataframe = Some(unwraped_df);
+    Ok(nuevo_esquema)
+}
 
+#[tauri::command]
+async fn exportar_csv(ruta: String,
+    state: State<'_, ContenedorDatos>
+) -> Result<(), String> {
 
+    let guardado = state.dataframe
+        .lock()
+        .map_err(|_| "Error al bloquear el estado")?;
+
+    let mut df = guardado
+        .clone().ok_or_else(|| "Ocurrio un error").map_err(|e| format!("No se pudo sacar el df del muteguard: {e}"))?;
+
+    //escribir_csv(df, &ruta).map_err(|e| format!("Error al escribir CSV: {}", e)
+    let mut file = File::create(&ruta).expect("could not create file");
+
+    CsvWriter::new(&mut file)
+        .include_header(true)
+        .with_separator(b',')
+        .finish(&mut df).map_err(|e| format!("No se pudo guardar el archivo: {e}"))?;
+    
+    Ok(())
+}
 

@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 export const useDataStore = defineStore("data", () => {
   const absolutePath = ref(null);
+  const rutaSugerida = ref(null);
   const blocksInMemmory = 3;
   const blockSize = 100;
   const nthCount = 3; // El nthcount debe ser siempre más pequeño que el block size
@@ -35,6 +36,29 @@ export const useDataStore = defineStore("data", () => {
 
   const updatePath = function (pathString) {
     absolutePath.value = pathString;
+    let rutaDeconstruida = pathString.split("/");
+    if (rutaDeconstruida.length <= 1) {
+      rutaDeconstruida = pathString.split("\\");
+      let nombre_sugerido = rutaDeconstruida[rutaDeconstruida.length - 1]
+        .toLowerCase()
+        .trim()
+        .replace(" ", "_")
+        .replace("-", "_")
+        .normalize("NFC")
+        .replace(/[\u0300-\u036f]/g, "");
+      rutaDeconstruida[rutaDeconstruida.length - 1] = nombre_sugerido;
+      rutaSugerida.value = rutaDeconstruida.join("\\");
+    } else {
+      let nombre_sugerido = rutaDeconstruida[rutaDeconstruida.length - 1]
+        .toLowerCase()
+        .trim()
+        .replace(" ", "_")
+        .replace("-", "_")
+        .normalize("NFC")
+        .replace(/[\u0300-\u036f]/g, "");
+      rutaDeconstruida[rutaDeconstruida.length - 1] = nombre_sugerido;
+      rutaSugerida.value = rutaDeconstruida.join("/");
+    }
   };
 
   const actualizarEsquemaColumnas = function (nuevoEsquema) {
@@ -205,6 +229,7 @@ export const useDataStore = defineStore("data", () => {
 
   return {
     absolutePath,
+    rutaSugerida,
     dataStatus,
     esquema,
     filas,
