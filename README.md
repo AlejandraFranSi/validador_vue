@@ -44,3 +44,8 @@ npm run tauri dev
 ```
 npm run tauri build
 ```
+
+## Pendientes:
+
+1. Evitar que la aplicación entre en pánico cuando las funciones de transformación de una columna fallan
+2. Evitar que la aplicación entre en pánico cuando se intenta modificar categorías que traen valores nulos
