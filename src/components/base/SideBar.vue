@@ -114,6 +114,11 @@ async function exportarCSV() {
 button:hover {
   background-color: var(--color-secundario-8);
 }
+
+button:disabled {
+  background-color: var(--color-secundario-3);
+  color: var(--color-neutro-2);
+}
 .is-selected {
   border-left: solid 5px var(--color-secundario-4);
 }

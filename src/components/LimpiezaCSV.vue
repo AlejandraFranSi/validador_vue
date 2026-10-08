@@ -26,18 +26,17 @@ const isFileLoaded = computed(() =>
       >
         Cargar Archivo
       </button>
-      <!--<button
-        class="boton-chico"
+      <button
         :class="
           estadoGlobal.subseccionSeleccionada === 'comparar'
             ? 'is-selected'
             : null
         "
         @click="estadoGlobal.actualizarVista('limpieza', 'comparar')"
-        :disabled="!isFileLoaded"
+        :disabled="!dataStore.absolutePath"
       >
         Comparar
-      </button> -->
+      </button>
       <button
         :class="
           estadoGlobal.subseccionSeleccionada === 'columnas'
